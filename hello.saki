@@ -1,2 +1,5 @@
 ika name = "Saki";
-saki("Hello, ", name, "!");
+ika x = 1;
+ika y = 2;
+ika z = x + y;
+saki("Hello, ", z, "!");
