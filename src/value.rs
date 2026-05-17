@@ -1,17 +1,25 @@
 use std::fmt;
 
 #[derive(Debug, Clone)]
+/// 运行时值类型。
 pub enum Value {
+    /// 整数值。
     Int(i64),
+    /// 字符串值。
     Str(String),
+    /// 布尔值。
     Bool(bool),
+    /// 空值。
     Null,
+    /// 用户定义函数。
     Function(Vec<String>, Vec<crate::ast::Stmt>),
+    /// 原生内建函数。
     NativeFunction(fn(&[Value]) -> Result<Value, String>),
 }
 
 // 手动实现 PartialEq，忽略 NativeFunction 的比较
 impl PartialEq for Value {
+    /// 比较两个运行时值是否相等。
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Value::Int(a), Value::Int(b)) => a == b,
@@ -29,6 +37,7 @@ impl PartialEq for Value {
 }
 
 impl fmt::Display for Value {
+    /// 将运行时值格式化为可读字符串。
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Value::Int(n) => write!(f, "{}", n),

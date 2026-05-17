@@ -1,14 +1,21 @@
 use crate::token::Token;
 
+/// 将字符流转换为 Token 流的词法分析器。
 pub struct Lexer {
+    /// 源码字符序列。
     source: Vec<char>,
+    /// 当前读取位置。
     pos: usize,
+    /// 当前字符。
     current: Option<char>,
 }
 
 impl Lexer {
+    /// 从源码文本创建词法分析器。
     pub fn new(source: &str) -> Self {
+        // 将源码拆成字符向量。
         let chars: Vec<char> = source.chars().collect();
+        // 读取首字符作为当前字符。
         let current = chars.first().copied();
         Lexer {
             source: chars,
@@ -17,11 +24,13 @@ impl Lexer {
         }
     }
 
+    /// 前进到下一个字符。
     fn advance(&mut self) {
         self.pos += 1;
         self.current = self.source.get(self.pos).copied();
     }
 
+    /// 跳过空白字符。
     fn skip_whitespace(&mut self) {
         while let Some(ch) = self.current {
             if ch.is_whitespace() {
@@ -32,7 +41,9 @@ impl Lexer {
         }
     }
 
+    /// 读取整数 token。
     fn number(&mut self) -> Token {
+        // 累积数字字符。
         let mut num_str = String::new();
         while let Some(ch) = self.current {
             if ch.is_ascii_digit() {
@@ -45,11 +56,15 @@ impl Lexer {
         Token::Int(num_str.parse().unwrap())
     }
 
+    /// 读取字符串 token。
     fn string(&mut self) -> Result<Token, String> {
+        // 跳过开头引号。
         self.advance(); // 跳过开头 "
+        // 累积字符串内容。
         let mut s = String::new();
         while let Some(ch) = self.current {
             if ch == '"' {
+                // 跳过结尾引号。
                 self.advance(); // 跳过结尾 "
                 return Ok(Token::Str(s));
             } else {
@@ -60,7 +75,9 @@ impl Lexer {
         Err("未闭合的字符串".to_string())
     }
 
+    /// 读取标识符或关键字 token。
     fn identifier(&mut self) -> Token {
+        // 累积标识符字符。
         let mut ident = String::new();
         while let Some(ch) = self.current {
             if ch.is_alphanumeric() || ch == '_' {
@@ -87,6 +104,7 @@ impl Lexer {
         }
     }
 
+    /// 获取下一个 token。
     pub fn next_token(&mut self) -> Result<Token, String> {
         self.skip_whitespace();
         match self.current {
@@ -177,12 +195,16 @@ impl Lexer {
     }
 }
 
+/// 支持预读的 Token 流。
 pub struct TokenStream {
+    /// 底层词法分析器。
     lexer: Lexer,
+    /// 预读的 token。
     peeked: Option<Token>,
 }
 
 impl TokenStream {
+    /// 从源码创建 Token 流。
     pub fn new(source: &str) -> Self {
         TokenStream {
             lexer: Lexer::new(source),
@@ -190,6 +212,7 @@ impl TokenStream {
         }
     }
 
+    /// 查看下一个 token，但不前进。
     pub fn peek(&mut self) -> Result<&Token, String> {
         if self.peeked.is_none() {
             self.peeked = Some(self.lexer.next_token()?);
@@ -197,6 +220,7 @@ impl TokenStream {
         Ok(self.peeked.as_ref().unwrap())
     }
 
+    /// 获取下一个 token 并前进。
     pub fn advance(&mut self) -> Result<Token, String> {
         if let Some(tok) = self.peeked.take() {
             Ok(tok)
@@ -205,7 +229,9 @@ impl TokenStream {
         }
     }
 
+    /// 断言下一个 token 类型。
     pub fn expect(&mut self, expected: Token) -> Result<(), String> {
+        // 读取实际 token。
         let tok = self.advance()?;
         if tok == expected {
             Ok(())
