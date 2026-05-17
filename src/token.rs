@@ -1,0 +1,35 @@
+#[derive(Debug, Clone, PartialEq)]
+pub enum Token {
+    Ika,  // 定义变量
+    Fn,  // 定义函数
+    Return, // 返回值
+    If,
+    Else,
+    While,
+    True,
+    False,
+    And,
+    Or,
+    Not,
+    Int(i64),
+    Str(String),
+    Ident(String),
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Eq,
+    EqEq,
+    Neq,
+    Lt,
+    Gt,
+    Le,
+    Ge,
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    Comma,
+    Semicolon,
+    Eof,
+}

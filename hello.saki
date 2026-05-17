@@ -1,0 +1,2 @@
+ika name = "Saki";
+saki("Hello, ", name, "!");
