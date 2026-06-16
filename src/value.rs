@@ -11,13 +11,17 @@ pub enum Value {
     Bool(bool),
     /// 空值。
     Null,
+    /// 未定义。
+    Undefined,
+    /// 数组值。
+    Array(Vec<Value>),
     /// 用户定义函数。
     Function(Vec<String>, Vec<crate::ast::Stmt>),
     /// 原生内建函数。
     NativeFunction(fn(&[Value]) -> Result<Value, String>),
 }
 
-// 手动实现 PartialEq，忽略 NativeFunction 的比较
+// 手动实现 PartialEq，忽略 NativeFunction 的比较。
 impl PartialEq for Value {
     /// 比较两个运行时值是否相等。
     fn eq(&self, other: &Self) -> bool {
@@ -26,10 +30,11 @@ impl PartialEq for Value {
             (Value::Str(a), Value::Str(b)) => a == b,
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::Null, Value::Null) => true,
+            (Value::Undefined, Value::Undefined) => true,
+            (Value::Array(a), Value::Array(b)) => a == b,
             (Value::Function(params1, body1), Value::Function(params2, body2)) => {
                 params1 == params2 && body1 == body2
             }
-            // 函数指针比较不可靠，直接返回 false
             (Value::NativeFunction(_), Value::NativeFunction(_)) => false,
             _ => false,
         }
@@ -44,6 +49,15 @@ impl fmt::Display for Value {
             Value::Str(s) => write!(f, "{}", s),
             Value::Bool(b) => write!(f, "{}", b),
             Value::Null => write!(f, "null"),
+            Value::Undefined => write!(f, "undefined"),
+            Value::Array(items) => {
+                let rendered = items
+                    .iter()
+                    .map(|item| item.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "[{}]", rendered)
+            }
             Value::Function(params, _) => write!(f, "<fn({})>", params.join(", ")),
             Value::NativeFunction(_) => write!(f, "<native fn>"),
         }

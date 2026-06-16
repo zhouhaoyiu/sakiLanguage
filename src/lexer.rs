@@ -13,9 +13,7 @@ pub struct Lexer {
 impl Lexer {
     /// 从源码文本创建词法分析器。
     pub fn new(source: &str) -> Self {
-        // 将源码拆成字符向量。
         let chars: Vec<char> = source.chars().collect();
-        // 读取首字符作为当前字符。
         let current = chars.first().copied();
         Lexer {
             source: chars,
@@ -41,9 +39,18 @@ impl Lexer {
         }
     }
 
+    /// 跳过单行注释。
+    fn skip_line_comment(&mut self) {
+        while let Some(ch) = self.current {
+            self.advance();
+            if ch == '\n' {
+                break;
+            }
+        }
+    }
+
     /// 读取整数 token。
     fn number(&mut self) -> Token {
-        // 累积数字字符。
         let mut num_str = String::new();
         while let Some(ch) = self.current {
             if ch.is_ascii_digit() {
@@ -56,31 +63,26 @@ impl Lexer {
         Token::Int(num_str.parse().unwrap())
     }
 
-    /// 读取字符串 token。
-    fn string(&mut self) -> Result<Token, String> {
-        // 跳过开头引号。
-        self.advance(); // 跳过开头 "
-        // 累积字符串内容。
+    /// 读取字符串 token（支持双引号与单引号）。
+    fn string_with_quote(&mut self, quote: char) -> Result<Token, String> {
+        self.advance(); // 跳过开头引号
         let mut s = String::new();
         while let Some(ch) = self.current {
-            if ch == '"' {
-                // 跳过结尾引号。
-                self.advance(); // 跳过结尾 "
+            if ch == quote {
+                self.advance(); // 跳过结尾引号
                 return Ok(Token::Str(s));
-            } else {
-                s.push(ch);
-                self.advance();
             }
+            s.push(ch);
+            self.advance();
         }
         Err("未闭合的字符串".to_string())
     }
 
     /// 读取标识符或关键字 token。
     fn identifier(&mut self) -> Token {
-        // 累积标识符字符。
         let mut ident = String::new();
         while let Some(ch) = self.current {
-            if ch.is_alphanumeric() || ch == '_' {
+            if ch.is_alphanumeric() || ch == '_' || ch == '$' {
                 ident.push(ch);
                 self.advance();
             } else {
@@ -91,10 +93,18 @@ impl Lexer {
         match ident.as_str() {
             "ika" => Token::Ika,
             "fn" => Token::Fn,
+            "function" => Token::Function,
+            "let" => Token::Let,
+            "var" => Token::Var,
+            "const" => Token::Const,
             "return" => Token::Return,
             "if" => Token::If,
             "else" => Token::Else,
             "while" => Token::While,
+            "break" => Token::Break,
+            "continue" => Token::Continue,
+            "null" => Token::Null,
+            "undefined" => Token::Undefined,
             "true" => Token::True,
             "false" => Token::False,
             "and" => Token::And,
@@ -124,7 +134,16 @@ impl Lexer {
                 }
                 '/' => {
                     self.advance();
-                    Ok(Token::Slash)
+                    if self.current == Some('/') {
+                        self.skip_line_comment();
+                        self.next_token()
+                    } else {
+                        Ok(Token::Slash)
+                    }
+                }
+                '%' => {
+                    self.advance();
+                    Ok(Token::Percent)
                 }
                 '(' => {
                     self.advance();
@@ -133,6 +152,14 @@ impl Lexer {
                 ')' => {
                     self.advance();
                     Ok(Token::RParen)
+                }
+                '[' => {
+                    self.advance();
+                    Ok(Token::LBracket)
+                }
+                ']' => {
+                    self.advance();
+                    Ok(Token::RBracket)
                 }
                 '{' => {
                     self.advance();
@@ -154,7 +181,12 @@ impl Lexer {
                     self.advance();
                     if self.current == Some('=') {
                         self.advance();
-                        Ok(Token::EqEq)
+                        if self.current == Some('=') {
+                            self.advance();
+                            Ok(Token::EqEqEq)
+                        } else {
+                            Ok(Token::EqEq)
+                        }
                     } else {
                         Ok(Token::Eq)
                     }
@@ -163,7 +195,12 @@ impl Lexer {
                     self.advance();
                     if self.current == Some('=') {
                         self.advance();
-                        Ok(Token::Neq)
+                        if self.current == Some('=') {
+                            self.advance();
+                            Ok(Token::NeqEq)
+                        } else {
+                            Ok(Token::Neq)
+                        }
                     } else {
                         Err("意外的字符 '!'".to_string())
                     }
@@ -186,9 +223,28 @@ impl Lexer {
                         Ok(Token::Gt)
                     }
                 }
-                '"' => self.string(),
+                '&' => {
+                    self.advance();
+                    if self.current == Some('&') {
+                        self.advance();
+                        Ok(Token::AndAnd)
+                    } else {
+                        Err("意外的字符 '&'".to_string())
+                    }
+                }
+                '|' => {
+                    self.advance();
+                    if self.current == Some('|') {
+                        self.advance();
+                        Ok(Token::OrOr)
+                    } else {
+                        Err("意外的字符 '|'".to_string())
+                    }
+                }
+                '"' => self.string_with_quote('"'),
+                '\'' => self.string_with_quote('\''),
                 ch if ch.is_ascii_digit() => Ok(self.number()),
-                ch if ch.is_alphabetic() || ch == '_' => Ok(self.identifier()),
+                ch if ch.is_alphabetic() || ch == '_' || ch == '$' => Ok(self.identifier()),
                 _ => Err(format!("意外的字符 '{}'", ch)),
             },
         }
@@ -231,7 +287,6 @@ impl TokenStream {
 
     /// 断言下一个 token 类型。
     pub fn expect(&mut self, expected: Token) -> Result<(), String> {
-        // 读取实际 token。
         let tok = self.advance()?;
         if tok == expected {
             Ok(())

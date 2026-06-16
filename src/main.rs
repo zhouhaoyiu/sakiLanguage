@@ -31,10 +31,8 @@ fn main() {
                         // 创建解释器。
                         let mut interpreter = Interpreter::new();
                         if let Err(e) = interpreter.interpret(&program) {
-                            if !e.starts_with("__return__") {
-                                eprintln!("运行时错误: {}", e);
-                                process::exit(1);
-                            }
+                            eprintln!("运行时错误: {}", e);
+                            process::exit(1);
                         }
                     }
                     Err(e) => {
@@ -74,9 +72,7 @@ fn main() {
             match parser.parse_program() {
                 Ok(program) => {
                     if let Err(e) = interpreter.interpret(&program) {
-                        if !e.starts_with("__return__") {
-                            eprintln!("运行时错误: {}", e);
-                        }
+                        eprintln!("运行时错误: {}", e);
                     }
                 }
                 Err(e) => eprintln!("解析错误: {}", e),
