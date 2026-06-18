@@ -36,7 +36,7 @@ impl Interpreter {
         for stmt in &program.statements {
             match self.execute(stmt)? {
                 ControlFlow::Value(_) => {}
-                ControlFlow::Return(_) => continue,
+                ControlFlow::Return(_) => return Err("return 不能在函数外使用".to_string()),
                 ControlFlow::Break | ControlFlow::Continue => {
                     return Err("break/continue 不能在循环外使用".to_string())
                 }
@@ -50,12 +50,15 @@ impl Interpreter {
         match stmt {
             Stmt::VarDecl(name, expr, kind) => {
                 let value = self.evaluate(expr)?;
-                let mutable = !matches!(kind, VarKind::Const);
-                self.env.define_with(name, value, mutable);
+                match kind {
+                    VarKind::Var => self.env.define_var(name, value),
+                    VarKind::Let => self.env.define(name, value),
+                    VarKind::Const => self.env.define_with(name, value, false),
+                }
                 Ok(ControlFlow::Value(Value::Null))
             }
             Stmt::FnDecl(name, params, body) => {
-                let func = Value::Function(params.clone(), body.clone());
+                let func = Value::Function(params.clone(), body.clone(), self.env.clone());
                 self.env.define(name, func);
                 Ok(ControlFlow::Value(Value::Null))
             }
@@ -87,11 +90,9 @@ impl Interpreter {
             Stmt::If(condition, then_stmts, else_stmts) => {
                 let condition = self.evaluate(condition)?;
                 if is_truthy(&condition) {
-                    let parent_env = std::mem::replace(&mut self.env, Environment::new());
-                    self.execute_block(then_stmts, Environment::new_enclosed(parent_env))
+                    self.execute_block(then_stmts, Environment::new_enclosed(self.env.clone()))
                 } else if let Some(stmts) = else_stmts {
-                    let parent_env = std::mem::replace(&mut self.env, Environment::new());
-                    self.execute_block(stmts, Environment::new_enclosed(parent_env))
+                    self.execute_block(stmts, Environment::new_enclosed(self.env.clone()))
                 } else {
                     Ok(ControlFlow::Value(Value::Null))
                 }
@@ -107,8 +108,7 @@ impl Interpreter {
                             break Ok(ControlFlow::Value(Value::Null));
                         }
 
-                        let parent_env = std::mem::replace(&mut self.env, Environment::new());
-                        match self.execute_block(body, Environment::new_enclosed(parent_env))? {
+                        match self.execute_block(body, Environment::new_enclosed(self.env.clone()))? {
                             ControlFlow::Value(_) => continue,
                             ControlFlow::Return(v) => {
                                 break Ok(ControlFlow::Return(v));
@@ -123,8 +123,7 @@ impl Interpreter {
                 result
             }
             Stmt::Block(stmts) => {
-                let parent_env = std::mem::replace(&mut self.env, Environment::new());
-                self.execute_block(stmts, Environment::new_enclosed(parent_env))
+                self.execute_block(stmts, Environment::new_enclosed(self.env.clone()))
             }
         }
     }
@@ -135,22 +134,25 @@ impl Interpreter {
         stmts: &[Stmt],
         new_env: Environment,
     ) -> Result<ControlFlow, String> {
-        let _old_env = std::mem::replace(&mut self.env, new_env);
+        let old_env = self.env.clone();
+        self.env = new_env;
         let mut result = Value::Null;
 
         for stmt in stmts {
-            match self.execute(stmt)? {
-                ControlFlow::Value(val) => result = val,
-                control => {
-                    let block_env = std::mem::replace(&mut self.env, Environment::new());
-                    self.env = block_env.pop_parent();
+            match self.execute(stmt) {
+                Err(err) => {
+                    self.env = old_env;
+                    return Err(err);
+                }
+                Ok(ControlFlow::Value(val)) => result = val,
+                Ok(control) => {
+                    self.env = old_env;
                     return Ok(control);
                 }
             }
         }
 
-        let block_env = std::mem::replace(&mut self.env, Environment::new());
-        self.env = block_env.pop_parent();
+        self.env = old_env;
         Ok(ControlFlow::Value(result))
     }
 
@@ -175,7 +177,9 @@ impl Interpreter {
                 self.env.set(name, value.clone())?;
                 Ok(value)
             }
-            Expr::FunctionExpr(params, body) => Ok(Value::Function(params.clone(), body.clone())),
+            Expr::FunctionExpr(params, body) => {
+                Ok(Value::Function(params.clone(), body.clone(), self.env.clone()))
+            }
             Expr::Binary(left, op, right) => {
                 let left_val = self.evaluate(left)?;
                 let result = match op {
@@ -297,7 +301,7 @@ impl Interpreter {
                     .collect::<Result<_, _>>()?;
 
                 match callee {
-                    Value::Function(params, body) => {
+                    Value::Function(params, body, closure_env) => {
                         if params.len() != evaluated_args.len() {
                             return Err(format!(
                                 "函数 '{}' 期望 {} 个参数，但传入了 {} 个",
@@ -307,8 +311,7 @@ impl Interpreter {
                             ));
                         }
 
-                        let parent_env = std::mem::replace(&mut self.env, Environment::new());
-                        let mut func_env = Environment::new_enclosed(parent_env);
+                        let func_env = Environment::new_function(closure_env);
                         for (param, arg) in params.iter().zip(evaluated_args.into_iter()) {
                             func_env.define(param, arg);
                         }
@@ -400,6 +403,24 @@ mod tests {
     }
 
     #[test]
+    fn closure_captures_definition_scope() {
+        let interpreter = run(
+            "fn make_counter() {
+                ika n = 0;
+                return fn() {
+                    n = n + 1;
+                    return n;
+                };
+            }
+            ika c = make_counter();
+            ika a = c();
+            ika b = c();",
+        );
+        assert_eq!(interpreter.env.get("a").unwrap(), Value::Int(1));
+        assert_eq!(interpreter.env.get("b").unwrap(), Value::Int(2));
+    }
+
+    #[test]
     fn array_access() {
         let interpreter = run("ika a = [1, 2, 3]; ika b = a[1];");
         assert_eq!(interpreter.env.get("b").unwrap(), Value::Int(2));
@@ -472,6 +493,40 @@ mod tests {
             .interpret(&parse("ika x = 1; if true { ika y = 2; } y = 3;"))
             .expect_err("expected block-scoped variable access to fail");
         assert_eq!(err, "未定义的变量 'y'");
+    }
+
+    #[test]
+    fn runtime_error_restores_previous_environment() {
+        let mut interpreter = Interpreter::new();
+        let err = interpreter
+            .interpret(&parse("ika x = 1; if true { ika y = 2; missing(); }"))
+            .expect_err("expected missing function to fail");
+        assert_eq!(err, "未定义的变量 'missing'");
+
+        interpreter.interpret(&parse("x = x + 1;")).unwrap();
+        assert_eq!(interpreter.env.get("x").unwrap(), Value::Int(2));
+        assert_eq!(interpreter.env.get("y").unwrap_err(), "未定义的变量 'y'");
+    }
+
+    #[test]
+    fn top_level_return_errors() {
+        let mut interpreter = Interpreter::new();
+        let err = interpreter
+            .interpret(&parse("return 1;"))
+            .expect_err("expected top-level return to fail");
+        assert_eq!(err, "return 不能在函数外使用");
+    }
+
+    #[test]
+    fn var_is_function_scoped() {
+        let interpreter = run(
+            "fn f() {
+                if true { var x = 3; }
+                return x;
+            }
+            ika y = f();",
+        );
+        assert_eq!(interpreter.env.get("y").unwrap(), Value::Int(3));
     }
 
     #[test]

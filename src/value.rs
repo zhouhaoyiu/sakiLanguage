@@ -1,4 +1,5 @@
 use std::fmt;
+use crate::environment::Environment;
 
 #[derive(Debug, Clone)]
 /// 运行时值类型。
@@ -16,7 +17,7 @@ pub enum Value {
     /// 数组值。
     Array(Vec<Value>),
     /// 用户定义函数。
-    Function(Vec<String>, Vec<crate::ast::Stmt>),
+    Function(Vec<String>, Vec<crate::ast::Stmt>, Environment),
     /// 原生内建函数。
     NativeFunction(fn(&[Value]) -> Result<Value, String>),
 }
@@ -32,7 +33,7 @@ impl PartialEq for Value {
             (Value::Null, Value::Null) => true,
             (Value::Undefined, Value::Undefined) => true,
             (Value::Array(a), Value::Array(b)) => a == b,
-            (Value::Function(params1, body1), Value::Function(params2, body2)) => {
+            (Value::Function(params1, body1, _), Value::Function(params2, body2, _)) => {
                 params1 == params2 && body1 == body2
             }
             (Value::NativeFunction(_), Value::NativeFunction(_)) => false,
@@ -58,7 +59,7 @@ impl fmt::Display for Value {
                     .join(", ");
                 write!(f, "[{}]", rendered)
             }
-            Value::Function(params, _) => write!(f, "<fn({})>", params.join(", ")),
+            Value::Function(params, _, _) => write!(f, "<fn({})>", params.join(", ")),
             Value::NativeFunction(_) => write!(f, "<native fn>"),
         }
     }
