@@ -1,23 +1,7 @@
-#![allow(dead_code)]
-
-#[path = "../src/ast.rs"]
-mod ast;
-#[path = "../src/environment.rs"]
-mod environment;
-#[path = "../src/interpreter.rs"]
-mod interpreter;
-#[path = "../src/parser.rs"]
-mod parser;
-#[path = "../src/token.rs"]
-mod token;
-#[path = "../src/lexer.rs"]
-mod lexer;
-#[path = "../src/value.rs"]
-mod value;
-
-use interpreter::Interpreter;
-use parser::Parser;
-use value::Value;
+use saki_lang::ast;
+use saki_lang::interpreter::Interpreter;
+use saki_lang::parser::Parser;
+use saki_lang::value::Value;
 
 fn parse(source: &str) -> ast::Program {
     let mut parser = Parser::new(source);
@@ -33,7 +17,7 @@ fn run(source: &str) -> Interpreter {
 #[test]
 fn assignment_updates_existing_binding() {
     let interpreter = run("ika x = 1; x = x + 1;");
-    assert_eq!(interpreter.env.get("x").unwrap(), Value::Int(2));
+    assert_eq!(interpreter.get("x").unwrap(), Value::Int(2));
 }
 
 #[test]
@@ -48,13 +32,13 @@ fn const_variable_is_readonly() {
 #[test]
 fn function_returns_value() {
     let interpreter = run("fn add(a, b) { return a + b; } ika x = add(3, 4);");
-    assert_eq!(interpreter.env.get("x").unwrap(), Value::Int(7));
+    assert_eq!(interpreter.get("x").unwrap(), Value::Int(7));
 }
 
 #[test]
 fn function_expression_call() {
     let interpreter = run("ika add = fn(a, b) { return a + b; }; ika x = add(1, 2);");
-    assert_eq!(interpreter.env.get("x").unwrap(), Value::Int(3));
+    assert_eq!(interpreter.get("x").unwrap(), Value::Int(3));
 }
 
 #[test]
@@ -62,35 +46,35 @@ fn closure_captures_definition_scope() {
     let interpreter = run(
         "fn make_counter() {\n            ika n = 0;\n            return fn() {\n                n = n + 1;\n                return n;\n            };\n        }\n        ika c = make_counter();\n        ika a = c();\n        ika b = c();",
     );
-    assert_eq!(interpreter.env.get("a").unwrap(), Value::Int(1));
-    assert_eq!(interpreter.env.get("b").unwrap(), Value::Int(2));
+    assert_eq!(interpreter.get("a").unwrap(), Value::Int(1));
+    assert_eq!(interpreter.get("b").unwrap(), Value::Int(2));
 }
 
 #[test]
 fn array_access() {
     let interpreter = run("ika a = [1, 2, 3]; ika b = a[1];");
-    assert_eq!(interpreter.env.get("b").unwrap(), Value::Int(2));
+    assert_eq!(interpreter.get("b").unwrap(), Value::Int(2));
 }
 
 #[test]
 fn null_and_undefined_runtime_values() {
     let interpreter = run("ika a = null; ika b = undefined;");
-    assert_eq!(interpreter.env.get("a").unwrap(), Value::Null);
-    assert_eq!(interpreter.env.get("b").unwrap(), Value::Undefined);
+    assert_eq!(interpreter.get("a").unwrap(), Value::Null);
+    assert_eq!(interpreter.get("b").unwrap(), Value::Undefined);
 }
 
 #[test]
 fn short_circuit_and_skips_rhs() {
     let interpreter = run("ika x = 0; ika ok = false and (x = 1);");
-    assert_eq!(interpreter.env.get("ok").unwrap(), Value::Bool(false));
-    assert_eq!(interpreter.env.get("x").unwrap(), Value::Int(0));
+    assert_eq!(interpreter.get("ok").unwrap(), Value::Bool(false));
+    assert_eq!(interpreter.get("x").unwrap(), Value::Int(0));
 }
 
 #[test]
 fn short_circuit_or_skips_rhs() {
     let interpreter = run("ika x = 0; ika ok = true or (x = 1);");
-    assert_eq!(interpreter.env.get("ok").unwrap(), Value::Bool(true));
-    assert_eq!(interpreter.env.get("x").unwrap(), Value::Int(0));
+    assert_eq!(interpreter.get("ok").unwrap(), Value::Bool(true));
+    assert_eq!(interpreter.get("x").unwrap(), Value::Int(0));
 }
 
 #[test]
@@ -98,7 +82,7 @@ fn while_break_and_continue_flow() {
     let interpreter = run(
         "ika x = 0;\n            while x < 5 {\n              x = x + 1;\n              if x == 2 { continue; }\n              if x == 4 { break; }\n            }",
     );
-    assert_eq!(interpreter.env.get("x").unwrap(), Value::Int(4));
+    assert_eq!(interpreter.get("x").unwrap(), Value::Int(4));
 }
 
 #[test]
@@ -145,8 +129,8 @@ fn runtime_error_restores_previous_environment() {
     assert_eq!(err, "未定义的变量 'missing'");
 
     interpreter.interpret(&parse("x = x + 1;")).unwrap();
-    assert_eq!(interpreter.env.get("x").unwrap(), Value::Int(2));
-    assert_eq!(interpreter.env.get("y").unwrap_err(), "未定义的变量 'y'");
+    assert_eq!(interpreter.get("x").unwrap(), Value::Int(2));
+    assert_eq!(interpreter.get("y").unwrap_err(), "未定义的变量 'y'");
 }
 
 #[test]
@@ -163,17 +147,17 @@ fn var_is_function_scoped() {
     let interpreter = run(
         "fn f() {\n            if true { var x = 3; }\n            return x;\n        }\n        ika y = f();",
     );
-    assert_eq!(interpreter.env.get("y").unwrap(), Value::Int(3));
+    assert_eq!(interpreter.get("y").unwrap(), Value::Int(3));
 }
 
 #[test]
 fn modulo_supports_integers() {
     let interpreter = run("ika x = 7 % 3;");
-    assert_eq!(interpreter.env.get("x").unwrap(), Value::Int(1));
+    assert_eq!(interpreter.get("x").unwrap(), Value::Int(1));
 }
 
 #[test]
 fn array_out_of_range_is_undefined() {
     let interpreter = run("ika a = [1, 2]; ika b = a[10];");
-    assert_eq!(interpreter.env.get("b").unwrap(), Value::Undefined);
+    assert_eq!(interpreter.get("b").unwrap(), Value::Undefined);
 }

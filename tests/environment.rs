@@ -1,14 +1,5 @@
-#![allow(dead_code)]
-
-#[path = "../src/ast.rs"]
-mod ast;
-#[path = "../src/environment.rs"]
-mod environment;
-#[path = "../src/value.rs"]
-mod value;
-
-use environment::Environment;
-use value::Value;
+use saki_lang::environment::Environment;
+use saki_lang::value::Value;
 
 fn i64v(n: i64) -> Value {
     Value::Int(n)

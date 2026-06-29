@@ -1,13 +1,5 @@
-mod token;
-mod lexer;
-mod ast;
-mod parser;
-mod value;
-mod environment;
-mod interpreter;
-
-use interpreter::Interpreter;
-use parser::Parser;
+use saki_lang::interpreter::Interpreter;
+use saki_lang::parser::Parser;
 use std::env;
 use std::fs;
 use std::io::{self, Write};

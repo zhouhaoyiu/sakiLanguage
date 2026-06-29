@@ -1,15 +1,5 @@
-#![allow(dead_code)]
-
-#[path = "../src/ast.rs"]
-mod ast;
-#[path = "../src/token.rs"]
-mod token;
-#[path = "../src/lexer.rs"]
-mod lexer;
-#[path = "../src/parser.rs"]
-mod parser;
-
-use parser::Parser;
+use saki_lang::ast;
+use saki_lang::parser::Parser;
 
 fn parse(source: &str) -> ast::Program {
     let mut parser = Parser::new(source);

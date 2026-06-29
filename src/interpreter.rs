@@ -5,7 +5,7 @@ use crate::value::Value;
 /// 语法树解释执行器。
 pub struct Interpreter {
     /// 当前执行环境。
-    pub(crate) env: Environment,
+    env: Environment,
     /// 当前循环层数。
     loop_depth: usize,
 }
@@ -29,6 +29,11 @@ impl Interpreter {
             env: Environment::new(),
             loop_depth: 0,
         }
+    }
+
+    /// 读取当前环境中的变量，供集成测试和外部调用检查结果。
+    pub fn get(&self, name: &str) -> Result<Value, String> {
+        self.env.get(name)
     }
 
     /// 执行整个程序。
