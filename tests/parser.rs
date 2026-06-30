@@ -45,7 +45,10 @@ fn parse_if_else() {
         ast::Stmt::ExprStmt(ast::Expr::Call(_, _))
     ));
     assert_eq!(else_body.len(), 1);
-    assert!(matches!(&else_body[0], ast::Stmt::ExprStmt(ast::Expr::Call(_, _))));
+    assert!(matches!(
+        &else_body[0],
+        ast::Stmt::ExprStmt(ast::Expr::Call(_, _))
+    ));
 }
 
 #[test]
@@ -53,7 +56,10 @@ fn parse_else_if() {
     let program = parse("if false { 1; } else if true { 2; } else { 3; }");
     assert_eq!(program.statements.len(), 1);
 
-    assert!(matches!(program.statements[0], ast::Stmt::If(_, _, Some(_))));
+    assert!(matches!(
+        program.statements[0],
+        ast::Stmt::If(_, _, Some(_))
+    ));
 
     let ast::Stmt::If(_, _, Some(else_body)) = &program.statements[0] else {
         panic!("expected if with else branch")
@@ -78,6 +84,25 @@ fn parse_break_and_continue_statements() {
 }
 
 #[test]
+fn parse_for_statement() {
+    let program = parse("for (let i = 0; i < 3; i = i + 1) { saki(i); }");
+    assert_eq!(program.statements.len(), 1);
+
+    let ast::Stmt::For(Some(init), Some(condition), Some(update), body) = &program.statements[0]
+    else {
+        panic!("expected for statement")
+    };
+
+    assert!(matches!(
+        init.as_ref(),
+        ast::Stmt::VarDecl(_, _, ast::VarKind::Let)
+    ));
+    assert!(matches!(condition, ast::Expr::Binary(_, ast::BinOp::Lt, _)));
+    assert!(matches!(update, ast::Expr::Assign(_, _)));
+    assert_eq!(body.len(), 1);
+}
+
+#[test]
 fn parse_function_expression() {
     let program = parse("ika f = fn(a, b) { return a + b; };");
     assert!(matches!(
@@ -98,19 +123,50 @@ fn parse_array_literal() {
 }
 
 #[test]
-fn parse_js_style_operator_aliases() {
-    let program = parse("ika x = 1 === 1; ika y = 2 !== 3; ika z = 1 && 0;");
-    assert_eq!(program.statements.len(), 3);
+fn parse_object_literal_and_property_access() {
+    let program = parse("let user = {name: 'saki', age: 1}; let name = user.name;");
+    assert_eq!(program.statements.len(), 2);
+
     assert!(matches!(
         &program.statements[0],
-        ast::Stmt::VarDecl(_, ast::Expr::Binary(_, ast::BinOp::EqEqEq, _), ast::VarKind::Let)
+        ast::Stmt::VarDecl(_, ast::Expr::Object(entries), ast::VarKind::Let) if entries.len() == 2
     ));
     assert!(matches!(
         &program.statements[1],
-        ast::Stmt::VarDecl(_, ast::Expr::Binary(_, ast::BinOp::NeqEq, _), ast::VarKind::Let)
+        ast::Stmt::VarDecl(_, ast::Expr::Property(_, name), ast::VarKind::Let) if name == "name"
+    ));
+}
+
+#[test]
+fn parse_js_style_operator_aliases() {
+    let program = parse("ika x = 1 === 1; ika y = 2 !== 3; ika z = 1 && 0; ika ok = !false;");
+    assert_eq!(program.statements.len(), 4);
+    assert!(matches!(
+        &program.statements[0],
+        ast::Stmt::VarDecl(
+            _,
+            ast::Expr::Binary(_, ast::BinOp::EqEqEq, _),
+            ast::VarKind::Let
+        )
+    ));
+    assert!(matches!(
+        &program.statements[1],
+        ast::Stmt::VarDecl(
+            _,
+            ast::Expr::Binary(_, ast::BinOp::NeqEq, _),
+            ast::VarKind::Let
+        )
     ));
     assert!(matches!(
         &program.statements[2],
-        ast::Stmt::VarDecl(_, ast::Expr::Binary(_, ast::BinOp::And, _), ast::VarKind::Let)
+        ast::Stmt::VarDecl(
+            _,
+            ast::Expr::Binary(_, ast::BinOp::And, _),
+            ast::VarKind::Let
+        )
+    ));
+    assert!(matches!(
+        &program.statements[3],
+        ast::Stmt::VarDecl(_, ast::Expr::Unary(ast::UnaryOp::Not, _), ast::VarKind::Let)
     ));
 }

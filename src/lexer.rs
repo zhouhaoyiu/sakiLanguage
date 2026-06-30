@@ -101,6 +101,7 @@ impl Lexer {
             "if" => Token::If,
             "else" => Token::Else,
             "while" => Token::While,
+            "for" => Token::For,
             "break" => Token::Break,
             "continue" => Token::Continue,
             "null" => Token::Null,
@@ -169,9 +170,17 @@ impl Lexer {
                     self.advance();
                     Ok(Token::RBrace)
                 }
+                ':' => {
+                    self.advance();
+                    Ok(Token::Colon)
+                }
                 ',' => {
                     self.advance();
                     Ok(Token::Comma)
+                }
+                '.' => {
+                    self.advance();
+                    Ok(Token::Dot)
                 }
                 ';' => {
                     self.advance();
@@ -202,7 +211,7 @@ impl Lexer {
                             Ok(Token::Neq)
                         }
                     } else {
-                        Err("意外的字符 '!'".to_string())
+                        Ok(Token::Not)
                     }
                 }
                 '<' => {

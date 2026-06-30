@@ -26,6 +26,8 @@ pub enum Expr {
     Ident(String),
     /// 数组字面量。
     Array(Vec<Expr>),
+    /// 对象字面量。
+    Object(Vec<(String, Expr)>),
     /// 函数表达式。
     FunctionExpr(Vec<String>, Vec<Stmt>),
     /// 一元运算表达式。
@@ -34,6 +36,8 @@ pub enum Expr {
     Binary(Box<Expr>, BinOp, Box<Expr>),
     /// 索引表达式。
     Index(Box<Expr>, Box<Expr>),
+    /// 属性访问表达式。
+    Property(Box<Expr>, String),
     /// 调用表达式。
     Call(Box<Expr>, Vec<Expr>),
     /// 赋值表达式。
@@ -107,6 +111,8 @@ pub enum Stmt {
     If(Expr, Vec<Stmt>, Option<Vec<Stmt>>),
     /// 循环语句。
     While(Expr, Vec<Stmt>),
+    /// for 循环语句。
+    For(Option<Box<Stmt>>, Option<Expr>, Option<Expr>, Vec<Stmt>),
 }
 
 /// 程序根节点。

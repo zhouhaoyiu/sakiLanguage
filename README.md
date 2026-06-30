@@ -4,7 +4,7 @@
 
 Saki Language 是一个用 Rust 实现的小型解释型语言，用于学习词法分析、语法分析与树遍历解释执行。
 
-当前支持：变量声明与赋值、函数定义与返回、闭包、整数/字符串/布尔/null/undefined 字面量、算术与比较运算、逻辑运算（and/or/not 及 &&/||）、条件语句（if/else）、循环语句（while）、break/continue、数组字面量与索引、函数表达式、内建输出函数 `saki`。  
+当前支持：变量声明与赋值、函数定义与返回、闭包、整数/字符串/布尔/null/undefined 字面量、算术与比较运算、逻辑运算（and/or/not/! 及 &&/||）、条件语句（if/else）、循环语句（while/for）、break/continue、数组字面量与索引、对象字面量与属性读取、函数表达式、内建输出函数 `saki`。  
   
 新增 JS 对齐语法入口：`let`、`const`、`var`、`function` 关键词（与 `ika`/`fn` 兼容）；新增空值语义 `undefined`，并支持 `===`、`!==`、`%` 等操作符。
 `const` 不能重赋值；`var` 进入最近的函数/全局作用域；顶层 `return` 会报错。
@@ -17,6 +17,7 @@ ika sum = 0;
 
 while i < 5 {
     if i == 3 {
+        i = i + 1;
         continue;
     }
     sum = sum + i;
@@ -39,6 +40,25 @@ fn add(a, b) {
 ika ok = true and not false;
 saki("sum = ", add(x, y));
 saki("ok = ", ok);
+```
+
+```saki
+let total = 0;
+
+for (let i = 0; i < 5; i = i + 1) {
+    if (i == 3) {
+        continue;
+    }
+    total = total + i;
+}
+
+saki(total);
+```
+
+```saki
+let user = {name: "saki", age: 1};
+saki(user.name);
+saki(user.missing);
 ```
 
 ```saki

@@ -60,7 +60,13 @@ impl Environment {
 
     /// 在作用域链中查找变量。
     pub fn get(&self, name: &str) -> Result<Value, String> {
-        if let Some(value) = self.inner.borrow().variables.get(name).map(|b| b.value.clone()) {
+        if let Some(value) = self
+            .inner
+            .borrow()
+            .variables
+            .get(name)
+            .map(|b| b.value.clone())
+        {
             return Ok(value);
         }
 
@@ -98,13 +104,10 @@ impl Environment {
 
     /// 在当前作用域中定义变量，并设置可变性。
     pub fn define_with(&self, name: &str, value: Value, mutable: bool) {
-        self.inner.borrow_mut().variables.insert(
-            name.to_string(),
-            Binding {
-                value,
-                mutable,
-            },
-        );
+        self.inner
+            .borrow_mut()
+            .variables
+            .insert(name.to_string(), Binding { value, mutable });
     }
 
     /// var 进入最近的函数/全局作用域。

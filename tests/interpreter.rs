@@ -78,11 +78,29 @@ fn short_circuit_or_skips_rhs() {
 }
 
 #[test]
+fn bang_operator_negates_truthy_values() {
+    let interpreter = run("let a = !false; let b = !1;");
+    assert_eq!(interpreter.get("a").unwrap(), Value::Bool(true));
+    assert_eq!(interpreter.get("b").unwrap(), Value::Bool(false));
+}
+
+#[test]
 fn while_break_and_continue_flow() {
     let interpreter = run(
         "ika x = 0;\n            while x < 5 {\n              x = x + 1;\n              if x == 2 { continue; }\n              if x == 4 { break; }\n            }",
     );
     assert_eq!(interpreter.get("x").unwrap(), Value::Int(4));
+}
+
+#[test]
+fn for_loop_runs_init_condition_update_and_continue() {
+    let interpreter = run("let sum = 0;
+        for (let i = 0; i < 5; i = i + 1) {
+            if i == 3 { continue; }
+            sum = sum + i;
+        }");
+    assert_eq!(interpreter.get("sum").unwrap(), Value::Int(7));
+    assert_eq!(interpreter.get("i").unwrap_err(), "未定义的变量 'i'");
 }
 
 #[test]
@@ -106,9 +124,7 @@ fn break_and_continue_in_function_body_is_invalid() {
     let err = interpreter
         .interpret(&parse("fn bad() { break; } bad();"))
         .expect_err("expected break in function to fail");
-    assert!(
-        err == "break 不能在循环外使用" || err == "break/continue 不能在函数体外使用"
-    );
+    assert!(err == "break 不能在循环外使用" || err == "break/continue 不能在函数体外使用");
 }
 
 #[test]
@@ -160,4 +176,15 @@ fn modulo_supports_integers() {
 fn array_out_of_range_is_undefined() {
     let interpreter = run("ika a = [1, 2]; ika b = a[10];");
     assert_eq!(interpreter.get("b").unwrap(), Value::Undefined);
+}
+
+#[test]
+fn object_property_access_returns_value_or_undefined() {
+    let interpreter =
+        run("let user = {name: 'saki', age: 1}; let name = user.name; let missing = user.missing;");
+    assert_eq!(
+        interpreter.get("name").unwrap(),
+        Value::Str("saki".to_string())
+    );
+    assert_eq!(interpreter.get("missing").unwrap(), Value::Undefined);
 }

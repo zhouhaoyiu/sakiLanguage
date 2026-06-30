@@ -35,6 +35,7 @@ impl Parser {
             Token::Continue => self.parse_continue_stmt(),
             Token::If => self.parse_if_stmt(),
             Token::While => self.parse_while_stmt(),
+            Token::For => self.parse_for_stmt(),
             Token::LBrace => self.parse_block(),
             _ => self.parse_expr_stmt(),
         }
@@ -169,6 +170,48 @@ impl Parser {
             Ok(Stmt::While(condition, stmts))
         } else {
             Err("while 语句的循环体必须是一个块".to_string())
+        }
+    }
+
+    /// 解析 JS 风格 for 语句。
+    fn parse_for_stmt(&mut self) -> Result<Stmt, String> {
+        self.tokens.expect(Token::For)?;
+        self.tokens.expect(Token::LParen)?;
+
+        let init = if *self.tokens.peek()? == Token::Semicolon {
+            self.tokens.advance()?;
+            None
+        } else if matches!(
+            self.tokens.peek()?,
+            Token::Ika | Token::Let | Token::Var | Token::Const
+        ) {
+            Some(Box::new(self.parse_var_decl()?))
+        } else {
+            let expr = self.parse_expression()?;
+            self.tokens.expect(Token::Semicolon)?;
+            Some(Box::new(Stmt::ExprStmt(expr)))
+        };
+
+        let condition = if *self.tokens.peek()? == Token::Semicolon {
+            self.tokens.advance()?;
+            None
+        } else {
+            let expr = self.parse_expression()?;
+            self.tokens.expect(Token::Semicolon)?;
+            Some(expr)
+        };
+
+        let update = if *self.tokens.peek()? == Token::RParen {
+            None
+        } else {
+            Some(self.parse_expression()?)
+        };
+        self.tokens.expect(Token::RParen)?;
+
+        if let Stmt::Block(stmts) = self.parse_block()? {
+            Ok(Stmt::For(init, condition, update, stmts))
+        } else {
+            Err("for 语句的循环体必须是一个块".to_string())
         }
     }
 
@@ -334,6 +377,14 @@ impl Parser {
                     self.tokens.expect(Token::RBracket)?;
                     expr = Expr::Index(Box::new(expr), Box::new(index));
                 }
+                Token::Dot => {
+                    self.tokens.advance()?;
+                    let name = match self.tokens.advance()? {
+                        Token::Ident(name) => name,
+                        _ => return Err("期望属性名".to_string()),
+                    };
+                    expr = Expr::Property(Box::new(expr), name);
+                }
                 _ => break,
             }
         }
@@ -372,8 +423,34 @@ impl Parser {
                 self.tokens.expect(Token::RBracket)?;
                 Ok(Expr::Array(items))
             }
+            Token::LBrace => self.parse_object_after_lbrace(),
             other => Err(format!("意外的 token: {:?}", other)),
         }
+    }
+
+    /// 解析对象字面量。
+    fn parse_object_after_lbrace(&mut self) -> Result<Expr, String> {
+        let mut entries = Vec::new();
+
+        if *self.tokens.peek()? != Token::RBrace {
+            loop {
+                let key = match self.tokens.advance()? {
+                    Token::Ident(name) | Token::Str(name) => name,
+                    _ => return Err("对象键必须是标识符或字符串".to_string()),
+                };
+                self.tokens.expect(Token::Colon)?;
+                entries.push((key, self.parse_expression()?));
+
+                if *self.tokens.peek()? == Token::Comma {
+                    self.tokens.advance()?;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        self.tokens.expect(Token::RBrace)?;
+        Ok(Expr::Object(entries))
     }
 
     /// 在 parse_primary 已经消费了 fn/function 的前提下解析函数表达式。
@@ -381,5 +458,4 @@ impl Parser {
         let (params, body) = self.parse_fn_signature()?;
         Ok(Expr::FunctionExpr(params, body))
     }
-
 }
