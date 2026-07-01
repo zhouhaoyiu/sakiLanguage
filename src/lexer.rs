@@ -50,7 +50,7 @@ impl Lexer {
     }
 
     /// 读取整数 token。
-    fn number(&mut self) -> Token {
+    fn number(&mut self) -> Result<Token, String> {
         let mut num_str = String::new();
         while let Some(ch) = self.current {
             if ch.is_ascii_digit() {
@@ -60,7 +60,10 @@ impl Lexer {
                 break;
             }
         }
-        Token::Int(num_str.parse().unwrap())
+        num_str
+            .parse()
+            .map(Token::Int)
+            .map_err(|_| format!("整数字面量超出范围: {}", num_str))
     }
 
     /// 读取字符串 token（支持双引号与单引号）。
@@ -252,7 +255,7 @@ impl Lexer {
                 }
                 '"' => self.string_with_quote('"'),
                 '\'' => self.string_with_quote('\''),
-                ch if ch.is_ascii_digit() => Ok(self.number()),
+                ch if ch.is_ascii_digit() => self.number(),
                 ch if ch.is_alphabetic() || ch == '_' || ch == '$' => Ok(self.identifier()),
                 _ => Err(format!("意外的字符 '{}'", ch)),
             },

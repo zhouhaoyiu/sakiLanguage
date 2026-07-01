@@ -30,6 +30,13 @@ fn parse_var_decl_and_assignment() {
 }
 
 #[test]
+fn integer_literal_overflow_returns_parse_error() {
+    let mut parser = Parser::new("let x = 9223372036854775808;");
+    let result = parser.parse_program();
+    assert!(matches!(result, Err(err) if err.contains("整数字面量超出范围")));
+}
+
+#[test]
 fn parse_if_else() {
     let program = parse("if false { saki(1); } else { saki(2); }");
     assert_eq!(program.statements.len(), 1);
