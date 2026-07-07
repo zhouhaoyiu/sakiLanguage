@@ -9,6 +9,8 @@ Saki Language 是一个用 Rust 实现的小型解释型语言，用于学习词
 新增 JS 对齐语法入口：`let`、`const`、`var`、`function` 关键词（与 `ika`/`fn` 兼容）；新增空值语义 `undefined`，并支持 `===`、`!==`、`%` 等操作符。
 `const` 不能重赋值；`var` 进入最近的函数/全局作用域；顶层 `return` 会报错。
 
+性能路径已加入 V8 思路的最小实现：直线脚本可显式编译为 bytecode 执行；对象使用 shape + slots 存储；重复属性访问会记录反馈并升为单态 inline cache；默认解释器仍走树遍历，避免单次 CLI 执行多一次编译成本。
+
 示例（对齐 JS 思想的基础控制流）：
 
 ```saki

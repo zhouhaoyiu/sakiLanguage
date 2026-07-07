@@ -14,10 +14,34 @@ fn run(source: &str) -> Interpreter {
     interpreter
 }
 
+fn run_bytecode(source: &str) -> Interpreter {
+    let mut interpreter = Interpreter::new();
+    interpreter.interpret_bytecode(&parse(source)).unwrap();
+    interpreter
+}
+
 #[test]
 fn assignment_updates_existing_binding() {
     let interpreter = run("ika x = 1; x = x + 1;");
     assert_eq!(interpreter.get("x").unwrap(), Value::Int(2));
+}
+
+#[test]
+fn straight_line_program_can_use_bytecode_tier() {
+    let interpreter = run_bytecode("let x = 1; x = x + 2;");
+    let stats = interpreter.optimization_stats();
+    assert_eq!(interpreter.get("x").unwrap(), Value::Int(3));
+    assert_eq!(stats.bytecode_runs, 1);
+    assert_eq!(stats.tree_walk_runs, 0);
+}
+
+#[test]
+fn default_interpret_uses_tree_walk_tier() {
+    let interpreter = run("let x = 1; x = x + 2;");
+    let stats = interpreter.optimization_stats();
+    assert_eq!(interpreter.get("x").unwrap(), Value::Int(3));
+    assert_eq!(stats.bytecode_runs, 0);
+    assert_eq!(stats.tree_walk_runs, 1);
 }
 
 #[test]
@@ -187,4 +211,20 @@ fn object_property_access_returns_value_or_undefined() {
         Value::Str("saki".to_string())
     );
     assert_eq!(interpreter.get("missing").unwrap(), Value::Undefined);
+}
+
+#[test]
+fn repeated_property_access_promotes_to_monomorphic_cache() {
+    let interpreter = run("let user = {name: 'saki'};
+        let i = 0;
+        while i < 4 {
+            let name = user.name;
+            i = i + 1;
+        }");
+    let stats = interpreter.optimization_stats();
+    assert_eq!(interpreter.get("i").unwrap(), Value::Int(4));
+    assert_eq!(stats.tree_walk_runs, 1);
+    assert!(stats.property_feedback_sites >= 1);
+    assert!(stats.monomorphic_property_sites >= 1);
+    assert!(stats.property_cache_hits >= 2);
 }

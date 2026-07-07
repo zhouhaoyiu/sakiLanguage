@@ -1,6 +1,81 @@
 use crate::environment::Environment;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::rc::Rc;
+
+#[derive(Debug, Clone, PartialEq)]
+/// 对象形状：属性名到 slot 的稳定映射。
+pub struct ObjectShape {
+    keys: Vec<String>,
+    offsets: BTreeMap<String, usize>,
+}
+
+impl ObjectShape {
+    /// 从属性顺序创建对象形状。
+    pub fn new(keys: Vec<String>) -> Self {
+        let offsets = keys
+            .iter()
+            .enumerate()
+            .map(|(index, key)| (key.clone(), index))
+            .collect();
+        ObjectShape { keys, offsets }
+    }
+
+    /// 形状唯一标识，用于 inline cache。
+    pub fn id(&self) -> usize {
+        self as *const Self as usize
+    }
+
+    /// 返回属性 slot。
+    pub fn slot(&self, key: &str) -> Option<usize> {
+        self.offsets.get(key).copied()
+    }
+
+    /// 返回属性名列表。
+    pub fn keys(&self) -> &[String] {
+        &self.keys
+    }
+}
+
+#[derive(Debug, Clone)]
+/// 对象值：共享形状 + 紧凑 slot。
+pub struct ObjectValue {
+    shape: Rc<ObjectShape>,
+    slots: Vec<Value>,
+}
+
+impl ObjectValue {
+    /// 创建对象值。
+    pub fn new(shape: Rc<ObjectShape>, slots: Vec<Value>) -> Self {
+        ObjectValue { shape, slots }
+    }
+
+    /// 形状唯一标识。
+    pub fn shape_id(&self) -> usize {
+        self.shape.id()
+    }
+
+    /// 返回属性 slot。
+    pub fn slot(&self, key: &str) -> Option<usize> {
+        self.shape.slot(key)
+    }
+
+    /// 按 slot 读取值。
+    pub fn get_slot(&self, slot: usize) -> Option<&Value> {
+        self.slots.get(slot)
+    }
+
+    /// 返回对象形状。
+    pub fn shape(&self) -> &ObjectShape {
+        &self.shape
+    }
+}
+
+impl PartialEq for ObjectValue {
+    fn eq(&self, other: &Self) -> bool {
+        self.shape.keys() == other.shape.keys() && self.slots == other.slots
+    }
+}
 
 #[derive(Debug, Clone)]
 /// 运行时值类型。
@@ -18,7 +93,7 @@ pub enum Value {
     /// 数组值。
     Array(Vec<Value>),
     /// 对象值。
-    Object(BTreeMap<String, Value>),
+    Object(ObjectValue),
     /// 用户定义函数。
     Function(Vec<String>, Vec<crate::ast::Stmt>, Environment),
     /// 原生内建函数。
@@ -65,8 +140,17 @@ impl fmt::Display for Value {
             }
             Value::Object(entries) => {
                 let rendered = entries
+                    .shape()
+                    .keys()
                     .iter()
-                    .map(|(key, value)| format!("{}: {}", key, value))
+                    .enumerate()
+                    .map(|(slot, key)| {
+                        format!(
+                            "{}: {}",
+                            key,
+                            entries.get_slot(slot).unwrap_or(&Value::Undefined)
+                        )
+                    })
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(f, "{{{}}}", rendered)

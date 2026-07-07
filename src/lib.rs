@@ -1,4 +1,5 @@
 pub mod ast;
+pub(crate) mod bytecode;
 pub mod environment;
 pub mod interpreter;
 pub mod lexer;

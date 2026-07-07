@@ -60,27 +60,22 @@ impl Environment {
 
     /// 在作用域链中查找变量。
     pub fn get(&self, name: &str) -> Result<Value, String> {
-        if let Some(value) = self
-            .inner
-            .borrow()
-            .variables
-            .get(name)
-            .map(|b| b.value.clone())
-        {
-            return Ok(value);
+        let mut env = Some(self.clone());
+        while let Some(current) = env {
+            let data = current.inner.borrow();
+            if let Some(binding) = data.variables.get(name) {
+                return Ok(binding.value.clone());
+            }
+            env = data.parent.clone();
         }
-
-        if let Some(parent) = self.inner.borrow().parent.clone() {
-            parent.get(name)
-        } else {
-            Err(format!("未定义的变量 '{}'", name))
-        }
+        Err(format!("未定义的变量 '{}'", name))
     }
 
     /// 变量赋值。
     pub fn set(&self, name: &str, value: Value) -> Result<(), String> {
-        {
-            let mut data = self.inner.borrow_mut();
+        let mut env = Some(self.clone());
+        while let Some(current) = env {
+            let mut data = current.inner.borrow_mut();
             if let Some(binding) = data.variables.get_mut(name) {
                 if !binding.mutable {
                     return Err(format!("变量 '{}' 是只读变量", name));
@@ -88,13 +83,9 @@ impl Environment {
                 binding.value = value;
                 return Ok(());
             }
+            env = data.parent.clone();
         }
-
-        if let Some(parent) = self.inner.borrow().parent.clone() {
-            parent.set(name, value)
-        } else {
-            Err(format!("未定义的变量 '{}'", name))
-        }
+        Err(format!("未定义的变量 '{}'", name))
     }
 
     /// 在当前作用域中定义可写变量。
@@ -112,15 +103,23 @@ impl Environment {
 
     /// var 进入最近的函数/全局作用域。
     pub fn define_var(&self, name: &str, value: Value) {
-        if self.inner.borrow().function_scope {
-            self.define(name, value);
-            return;
-        }
+        let mut target = self.clone();
+        loop {
+            let parent = {
+                let data = target.inner.borrow();
+                if data.function_scope {
+                    None
+                } else {
+                    data.parent.clone()
+                }
+            };
 
-        if let Some(parent) = self.inner.borrow().parent.clone() {
-            parent.define_var(name, value);
-        } else {
-            self.define(name, value);
+            if let Some(parent) = parent {
+                target = parent;
+            } else {
+                target.define(name, value);
+                return;
+            }
         }
     }
 }
