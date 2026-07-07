@@ -2,6 +2,13 @@
 name = "saki-lang"
 version = "0.1.0"
 edition = "2024"
+description = "A small Rust tree-walk interpreter for the Saki language."
+license = "MIT"
+repository = "https://github.com/zhouhaoyiu/sakiLanguage"
+homepage = "https://github.com/zhouhaoyiu/sakiLanguage"
+readme = "readme.md"
+keywords = ["language", "interpreter", "parser"]
+categories = ["compilers"]
 
 [dependencies]
 # 无外部依赖
