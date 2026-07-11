@@ -4,5 +4,6 @@ pub mod environment;
 pub mod interpreter;
 pub mod lexer;
 pub mod parser;
+pub mod seismic;
 pub mod token;
 pub mod value;

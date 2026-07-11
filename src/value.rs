@@ -65,6 +65,11 @@ impl ObjectValue {
         self.slots.get(slot)
     }
 
+    /// 按属性名读取值。
+    pub fn get(&self, key: &str) -> Option<&Value> {
+        self.slot(key).and_then(|slot| self.get_slot(slot))
+    }
+
     /// 返回对象形状。
     pub fn shape(&self) -> &ObjectShape {
         &self.shape
@@ -82,6 +87,8 @@ impl PartialEq for ObjectValue {
 pub enum Value {
     /// 整数值。
     Int(i64),
+    /// 浮点值，供科学计算内建函数使用。
+    Float(f64),
     /// 字符串值。
     Str(String),
     /// 布尔值。
@@ -100,12 +107,33 @@ pub enum Value {
     NativeFunction(fn(&[Value]) -> Result<Value, String>),
 }
 
+impl Value {
+    /// 构造对象值。
+    pub fn object(entries: Vec<(&str, Value)>) -> Self {
+        let keys = entries
+            .iter()
+            .map(|(key, _)| key.to_string())
+            .collect::<Vec<_>>();
+        let slots = entries.into_iter().map(|(_, value)| value).collect();
+        Value::Object(ObjectValue::new(Rc::new(ObjectShape::new(keys)), slots))
+    }
+
+    /// 读取对象属性。
+    pub fn property(&self, key: &str) -> Option<&Value> {
+        match self {
+            Value::Object(object) => object.get(key),
+            _ => None,
+        }
+    }
+}
+
 // 手动实现 PartialEq，忽略 NativeFunction 的比较。
 impl PartialEq for Value {
     /// 比较两个运行时值是否相等。
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Value::Int(a), Value::Int(b)) => a == b,
+            (Value::Float(a), Value::Float(b)) => a == b,
             (Value::Str(a), Value::Str(b)) => a == b,
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::Null, Value::Null) => true,
@@ -126,6 +154,7 @@ impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Value::Int(n) => write!(f, "{}", n),
+            Value::Float(n) => write!(f, "{}", n),
             Value::Str(s) => write!(f, "{}", s),
             Value::Bool(b) => write!(f, "{}", b),
             Value::Null => write!(f, "null"),

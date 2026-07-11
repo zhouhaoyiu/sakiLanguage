@@ -2,6 +2,7 @@ use saki_lang::ast;
 use saki_lang::interpreter::Interpreter;
 use saki_lang::parser::Parser;
 use saki_lang::value::Value;
+use std::fs;
 
 fn parse(source: &str) -> ast::Program {
     let mut parser = Parser::new(source);
@@ -227,4 +228,49 @@ fn repeated_property_access_promotes_to_monomorphic_cache() {
     assert!(stats.property_feedback_sites >= 1);
     assert!(stats.monomorphic_property_sites >= 1);
     assert!(stats.property_cache_hits >= 2);
+}
+
+#[test]
+fn seismic_workflow_builtins_return_metadata_objects() {
+    let interpreter = run("let wf = {kind: 'waveform', samples: [0, 1, 2, 3, 2, 1, 0, -1, -2, -3, -2, -1, 0, 1, 2, 3, 2, 1, 0, -1], sampling_rate_hz: 10, unit: 'counts'};
+        let filtered = bandpass(wf, 1, 4);
+        let win = window(filtered, 0, 1);
+        let p = pick(win, 'P');
+        let gm = ground_motion(win, 'PGA');
+        let report = qc(win);
+        let inv = source_inversion([[1,0,0,0,0,0],[0,1,0,0,0,0],[0,0,1,0,0,0],[0,0,0,1,0,0],[0,0,0,0,1,0],[0,0,0,0,0,1]], [1,2,3,4,5,6]);");
+
+    let p = interpreter.get("p").unwrap();
+    let gm = interpreter.get("gm").unwrap();
+    let report = interpreter.get("report").unwrap();
+    let inv = interpreter.get("inv").unwrap();
+
+    assert_eq!(p.property("kind"), Some(&Value::Str("pick".to_string())));
+    assert_eq!(p.property("phase"), Some(&Value::Str("P".to_string())));
+    assert!(matches!(gm.property("value"), Some(Value::Float(value)) if *value >= 0.0));
+    assert_eq!(report.property("ok"), Some(&Value::Bool(true)));
+    assert_eq!(
+        inv.property("kind"),
+        Some(&Value::Str("source_inversion".to_string()))
+    );
+}
+
+#[test]
+fn export_builtin_writes_value_to_file() {
+    let path = std::env::temp_dir().join(format!("saki-export-{}.txt", std::process::id()));
+    let source = format!(
+        "let x = {{kind: 'qc_report', ok: true}}; let out = export(x, '{}');",
+        path.display()
+    );
+    let interpreter = run(&source);
+    let out = interpreter.get("out").unwrap();
+    let written = fs::read_to_string(&path).unwrap();
+
+    assert_eq!(
+        out.property("kind"),
+        Some(&Value::Str("export".to_string()))
+    );
+    assert!(written.contains("qc_report"));
+
+    let _ = fs::remove_file(path);
 }
